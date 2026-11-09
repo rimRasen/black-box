@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Black Box settings</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <img src="icons/icon-32.png" width="24" height="24" alt="">
+    <h1>Black Box</h1>
+  </header>
+
+  <label class="option">
+    <input type="checkbox" id="collapseEmpty">
+    <span>
+      <strong>Collapse empty boxes</strong>
+      <small>Remove blank gaps left behind in the timeline.</small>
+    </span>
+  </label>
+
+  <label class="option">
+    <input type="checkbox" id="hideBoosted">
+    <span>
+      <strong>Hide boosted posts</strong>
+      <small>Hide posts labeled "Ad", "Promoted" or "Boosted". Only works when X is in English.</small>
+    </span>
+  </label>
+
+  <p class="note">Changes apply right away. No need to refresh.</p>
+  <script src="popup.js"></script>
+</body>
+</html>

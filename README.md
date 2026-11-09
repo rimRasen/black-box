@@ -7,6 +7,17 @@ A small browser extension that removes the **empty black boxes** in the X (Twitt
 When an ad blocker hides an ad or promoted post, X often keeps the space it would have used.
 That leaves a big blank gap between posts. Black Box finds these empty slots and collapses them.
 
+## Settings
+
+Click the Black Box icon in your browser toolbar:
+
+| Option | Default | What it does |
+|---|---|---|
+| **Collapse empty boxes** | On | Removes blank gaps in the timeline. |
+| **Hide boosted posts** | Off | Hides posts X labels "Ad", "Promoted" or "Boosted". English X only for now. |
+
+Changes apply right away, with no refresh needed.
+
 Works in **Firefox** (desktop and Android) and **Chromium browsers** (Chrome, Edge, Brave, Opera).
 
 ## Install
@@ -27,11 +38,22 @@ Works in **Firefox** (desktop and Android) and **Chromium browsers** (Chrome, Ed
 ## How it works
 
 `extension/content.js` watches X's timeline cells (`[data-testid="cellInnerDiv"]`). If a cell is at least
-40px tall but shows no visible text, images, video or links for about 0.6 seconds, it is collapsed to zero
+40px tall but shows no visible text, images or video for about 0.6 seconds, it is collapsed to zero
 height. X's list then measures it again and moves the posts below up. If content appears in it later, the
 cell is shown again.
 
-No permissions, no network requests, no data collection. See [PRIVACY.md](PRIVACY.md).
+**Hide boosted posts** looks inside each post for a label that reads exactly "Ad", "Promoted" or "Boosted".
+The post's own text, author name and link previews are skipped, so a post that just says "Ad" isn't hidden.
+To support another language, add its labels to `BOOSTED_LABELS` in `content.js`.
+
+The only permission is `storage`, used to save your two settings. No network requests, no data collection.
+See [PRIVACY.md](PRIVACY.md).
+
+### Debug mode
+
+In the x.com DevTools console, run `localStorage.blackBoxDebug = '1'` and refresh. The console then logs every
+box that gets collapsed and every boosted post that gets hidden. Tall boxes that are kept without a post get a
+red dashed outline. Turn it off with `localStorage.removeItem('blackBoxDebug')`.
 
 ## Development
 
@@ -46,7 +68,7 @@ npm run icons           # regenerate icons (needs Python + Pillow)
 Project layout:
 
 ```
-extension/        # what gets shipped: manifest, content script, CSS, icons
+extension/        # what gets shipped: manifest, content script + CSS, settings popup, icons
 scripts/          # helper scripts (icon generator)
 .github/workflows # CI: lint + build zip, attach it to releases on v* tags
 ```

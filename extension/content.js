@@ -1,5 +1,6 @@
 // Black Box: hides empty boxes left behind in the X timeline
-// (usually ads/promoted posts whose content was blocked).
+// (usually ads/promoted posts whose content was blocked), and optionally
+// hides boosted/promoted posts themselves.
 //
 // Debug mode: in the x.com DevTools console run
 //   localStorage.blackBoxDebug = '1'   then reload
@@ -10,12 +11,22 @@
 (() => {
   const CELL = '[data-testid="cellInnerDiv"]';
   const HIDDEN = 'bb-empty-cell';
+  const BOOSTED = 'bb-boosted';
   const MIN_GAP_PX = 40; // ignore thin divider cells
   const CONFIRM_MS = 600; // cell must stay empty this long before we collapse it
   // Elements that draw pixels without text. Links/buttons are left out because
   // they're often empty, transparent wrappers; their visible text/icons are
   // checked separately.
   const MEDIA = 'img, video, canvas, iframe, svg, [role="progressbar"], [style*="background-image"]';
+
+  // Labels X puts on paid posts. Matched exactly, and never inside the post's
+  // own text, author name or link card, so a tweet that just says "Ad" is safe.
+  // Add translations here if you use X in another language.
+  const BOOSTED_LABELS = new Set(['Ad', 'Promoted', 'Boosted']);
+  const NOT_A_LABEL = '[data-testid="tweetText"], [data-testid="User-Name"], [data-testid="card.wrapper"]';
+
+  const api = globalThis.browser ?? globalThis.chrome;
+  const settings = { collapseEmpty: true, hideBoosted: false };
 
   let DEBUG = false;
   try {
@@ -78,6 +89,18 @@
     return null;
   }
 
+  // Returns the paid-post label found in the cell's post, or null.
+  function findBoostedLabel(cell) {
+    const article = cell.querySelector('article');
+    if (!article) return null;
+    const walker = document.createTreeWalker(article, NodeFilter.SHOW_TEXT);
+    for (let t = walker.nextNode(); t; t = walker.nextNode()) {
+      const text = t.data.trim();
+      if (BOOSTED_LABELS.has(text) && t.parentElement && !t.parentElement.closest(NOT_A_LABEL)) return text;
+    }
+    return null;
+  }
+
   function debugKept(cell, content) {
     if (!DEBUG || reported.has(cell) || cell.offsetHeight < MIN_GAP_PX) return;
     // Only report cells that look suspicious: tall but with no tweet in them.
@@ -88,6 +111,23 @@
   }
 
   function check(cell, now) {
+    // Boosted posts (only when the user turned that option on).
+    const label = settings.hideBoosted ? findBoostedLabel(cell) : null;
+    if (label) {
+      if (!cell.classList.contains(BOOSTED)) {
+        cell.classList.add(BOOSTED);
+        if (DEBUG) console.log(`[Black Box] hid boosted post (label "${label}"):`, cell);
+      }
+      return;
+    }
+    cell.classList.remove(BOOSTED);
+
+    if (!settings.collapseEmpty) {
+      cell.classList.remove(HIDDEN);
+      pending.delete(cell);
+      return;
+    }
+
     const content = findVisibleContent(cell);
 
     if (cell.classList.contains(HIDDEN)) {
@@ -135,6 +175,19 @@
     const now = performance.now();
     document.querySelectorAll(CELL).forEach((cell) => check(cell, now));
   }
+
+  // Load the user's settings, and re-apply them right away when they change.
+  api.storage.sync.get(settings).then((saved) => {
+    Object.assign(settings, saved);
+    scheduleScan(0);
+  });
+  api.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'sync') return;
+    for (const [key, { newValue }] of Object.entries(changes)) {
+      if (key in settings) settings[key] = newValue;
+    }
+    scheduleScan(0);
+  });
 
   new MutationObserver(() => scheduleScan()).observe(document.body, {
     childList: true,
