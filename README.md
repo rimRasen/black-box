@@ -14,7 +14,7 @@ Click the Black Box icon in your browser toolbar:
 | Option | Default | What it does |
 |---|---|---|
 | **Collapse empty boxes** | On | Removes blank gaps in the timeline. |
-| **Hide boosted posts** | Off | Hides posts X labels "Ad", "Promoted" or "Boosted". English X only for now. |
+| **Hide boosted posts** | Off | Hides posts X marks as paid ("Boosted", "Ad", "Promoted"). |
 
 Changes apply right away, with no refresh needed.
 
@@ -42,9 +42,12 @@ Works in **Firefox** (desktop and Android) and **Chromium browsers** (Chrome, Ed
 height. X's list then measures it again and moves the posts below up. If content appears in it later, the
 cell is shown again.
 
-**Hide boosted posts** looks inside each post for a label that reads exactly "Ad", "Promoted" or "Boosted".
-The post's own text, author name and link previews are skipped, so a post that just says "Ad" isn't hidden.
-To support another language, add its labels to `BOOSTED_LABELS` in `content.js`.
+**Hide boosted posts** looks for X's paid-post label:
+- On X's newer site, the "Boosted" label has a rocket icon (`svg[data-icon="icon-rocket"]`). It's matched in
+  any language, but ignored inside buttons, links and menus, so a "Boost" button doesn't count. From the label,
+  the extension moves up the page to the timeline item it belongs to and collapses it.
+- On the older site, it looks for a label that reads exactly "Ad", "Promoted" or "Boosted". It skips the post's
+  own text, author name and link previews. Add translations to `BOOSTED_LABELS` in `content.js`.
 
 The only permission is `storage`, used to save your two settings. No network requests, no data collection.
 See [PRIVACY.md](PRIVACY.md).

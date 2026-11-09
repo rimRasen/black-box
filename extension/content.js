@@ -89,16 +89,64 @@
     return null;
   }
 
-  // Returns the paid-post label found in the cell's post, or null.
-  function findBoostedLabel(cell) {
-    const article = cell.querySelector('article');
-    if (!article) return null;
-    const walker = document.createTreeWalker(article, NodeFilter.SHOW_TEXT);
-    for (let t = walker.nextNode(); t; t = walker.nextNode()) {
-      const text = t.data.trim();
-      if (BOOSTED_LABELS.has(text) && t.parentElement && !t.parentElement.closest(NOT_A_LABEL)) return text;
+  // ---- Boosted posts ----------------------------------------------------
+  // New X site: the "Boosted" label has a rocket icon, the same in every language.
+  // It's skipped inside buttons/links/menus so a "Boost post" button never counts.
+  const ROCKET = 'svg[data-icon="icon-rocket"]';
+  const INTERACTIVE = 'button, a, [role="button"], [role="link"], [role="menuitem"], [role="menu"], nav';
+  const MIN_POST_PX = 60;
+
+  // Finds the timeline item (one post) that contains `el`. Works on any layout
+  // by climbing until we reach an element that sits in a row of similar,
+  // post-sized siblings, which is what a timeline list looks like.
+  function findPostItem(el) {
+    const oldCell = el.closest(CELL);
+    if (oldCell) return oldCell;
+    const sig = (n) => `${n.tagName}|${n.getAttribute('role') || ''}|${n.dataset.testid || ''}`;
+    for (let node = el; node && node.parentElement && node !== document.body; node = node.parentElement) {
+      if (node.classList.contains(BOOSTED)) return node; // already collapsed by us
+      if (node.offsetHeight < MIN_POST_PX) continue;
+      let similar = 0;
+      for (const sib of node.parentElement.children) {
+        if (sib !== node && sig(sib) === sig(node) && sib.offsetHeight >= MIN_POST_PX) similar++;
+      }
+      if (similar >= 2) return node;
     }
     return null;
+  }
+
+  // Returns a Map of post element -> label description, for every boosted post on the page.
+  function findBoostedPosts() {
+    const found = new Map();
+    for (const icon of document.querySelectorAll(ROCKET)) {
+      if (icon.closest(INTERACTIVE)) continue;
+      const post = findPostItem(icon);
+      if (post) found.set(post, `rocket icon + "${(icon.parentElement?.parentElement?.innerText || '').trim()}"`);
+    }
+    // Old X site: plain text label inside the post.
+    for (const article of document.querySelectorAll(`${CELL} article`)) {
+      const walker = document.createTreeWalker(article, NodeFilter.SHOW_TEXT);
+      for (let t = walker.nextNode(); t; t = walker.nextNode()) {
+        const text = t.data.trim();
+        if (BOOSTED_LABELS.has(text) && t.parentElement && !t.parentElement.closest(NOT_A_LABEL)) {
+          found.set(article.closest(CELL), `text "${text}"`);
+          break;
+        }
+      }
+    }
+    return found;
+  }
+
+  function updateBoosted() {
+    const boosted = settings.hideBoosted ? findBoostedPosts() : new Map();
+    for (const el of document.querySelectorAll(`.${BOOSTED}`)) {
+      if (!boosted.has(el)) el.classList.remove(BOOSTED);
+    }
+    for (const [post, why] of boosted) {
+      if (post.classList.contains(BOOSTED)) continue;
+      post.classList.add(BOOSTED);
+      if (DEBUG) console.log(`[Black Box] hid boosted post (${why}):`, post);
+    }
   }
 
   function debugKept(cell, content) {
@@ -111,16 +159,7 @@
   }
 
   function check(cell, now) {
-    // Boosted posts (only when the user turned that option on).
-    const label = settings.hideBoosted ? findBoostedLabel(cell) : null;
-    if (label) {
-      if (!cell.classList.contains(BOOSTED)) {
-        cell.classList.add(BOOSTED);
-        if (DEBUG) console.log(`[Black Box] hid boosted post (label "${label}"):`, cell);
-      }
-      return;
-    }
-    cell.classList.remove(BOOSTED);
+    if (cell.classList.contains(BOOSTED)) return; // already hidden as a boosted post
 
     if (!settings.collapseEmpty) {
       cell.classList.remove(HIDDEN);
@@ -173,6 +212,7 @@
   function scan() {
     timer = null;
     const now = performance.now();
+    updateBoosted();
     document.querySelectorAll(CELL).forEach((cell) => check(cell, now));
   }
 
