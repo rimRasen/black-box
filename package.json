@@ -1,8 +1,8 @@
 {
   "name": "black-box",
-  "version": "1.1.2",
+  "version": "1.2.0",
   "private": true,
-  "description": "Browser extension that collapses empty placeholder boxes in the X timeline and can hide boosted posts.",
+  "description": "Browser extension that collapses empty placeholder boxes in the X timeline.",
   "license": "MIT",
   "author": "rimRasen",
   "repository": {

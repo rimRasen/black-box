@@ -1,6 +1,5 @@
 // Black Box: hides empty boxes left behind in the X timeline
-// (usually ads/promoted posts whose content was blocked), and optionally
-// hides boosted/promoted posts themselves.
+// (usually ads/promoted posts whose content was blocked).
 //
 // Debug mode: in the x.com DevTools console run
 //   localStorage.blackBoxDebug = '1'   then reload
@@ -11,22 +10,12 @@
 (() => {
   const CELL = '[data-testid="cellInnerDiv"]';
   const HIDDEN = 'bb-empty-cell';
-  const BOOSTED = 'bb-boosted';
   const MIN_GAP_PX = 40; // ignore thin divider cells
   const CONFIRM_MS = 600; // cell must stay empty this long before we collapse it
   // Elements that draw pixels without text. Links/buttons are left out because
   // they're often empty, transparent wrappers; their visible text/icons are
   // checked separately.
   const MEDIA = 'img, video, canvas, iframe, svg, [role="progressbar"], [style*="background-image"]';
-
-  // Labels X puts on paid posts. Matched exactly, and never inside the post's
-  // own text, author name or link card, so a tweet that just says "Ad" is safe.
-  // Add translations here if you use X in another language.
-  const BOOSTED_LABELS = new Set(['Ad', 'Promoted', 'Boosted']);
-  const NOT_A_LABEL = '[data-testid="tweetText"], [data-testid="User-Name"], [data-testid="card.wrapper"]';
-
-  const api = globalThis.browser ?? globalThis.chrome;
-  const settings = { collapseEmpty: true, hideBoosted: false };
 
   let DEBUG = false;
   try {
@@ -89,87 +78,6 @@
     return null;
   }
 
-  // ---- Boosted posts ----------------------------------------------------
-  // New X site: the "Boosted" label has a rocket icon, the same in every language.
-  // It's skipped inside buttons/links/menus so a "Boost post" button never counts.
-  const ROCKET = 'svg[data-icon="icon-rocket"]';
-  const INTERACTIVE = 'button, a, [role="button"], [role="link"], [role="menuitem"], [role="menu"], nav';
-  const MIN_POST_PX = 60;
-
-  // Finds the timeline item (one post) that contains `el`. Works on any layout:
-  // climbing up from the label, every element that sits among similar,
-  // post-sized siblings is a candidate. The one with the MOST such siblings
-  // wins, because the timeline list has more items than any block inside a
-  // post (text, media...). We never climb past X's main column.
-  const PAGE_LEVEL = 'main, [role="main"], nav, [role="navigation"]';
-  function findPostItem(el) {
-    const oldCell = el.closest(CELL);
-    if (oldCell) return oldCell;
-    const sig = (n) => `${n.tagName}|${n.getAttribute('role') || ''}|${n.dataset.testid || ''}`;
-    let best = null;
-    let bestScore = 0;
-    for (let node = el; node && node.parentElement && node !== document.body; node = node.parentElement) {
-      if (node.classList.contains(BOOSTED)) return node; // already collapsed by us
-      if (node.matches(PAGE_LEVEL) || node.querySelector(PAGE_LEVEL)) break;
-      if (node.offsetHeight < MIN_POST_PX) continue;
-      let similar = 0;
-      for (const sib of node.parentElement.children) {
-        if (sib !== node && sig(sib) === sig(node) && sib.offsetHeight >= MIN_POST_PX) similar++;
-      }
-      if (similar >= 2 && similar > bestScore) {
-        best = node;
-        bestScore = similar;
-      }
-    }
-    return best;
-  }
-
-  // Returns a Map of post element -> label description, for every boosted post on the page.
-  function findBoostedPosts() {
-    const found = new Map();
-    for (const icon of document.querySelectorAll(ROCKET)) {
-      if (icon.closest(INTERACTIVE)) {
-        debugOnce(icon, '[Black Box] ignored rocket icon inside a button/link/menu:', icon);
-        continue;
-      }
-      const post = findPostItem(icon);
-      if (post) found.set(post, `rocket icon + "${(icon.parentElement?.parentElement?.innerText || '').trim()}"`);
-      else debugOnce(icon, '[Black Box] found a rocket label but could not work out which post it belongs to:', icon);
-    }
-    // Old X site: plain text label inside the post.
-    for (const article of document.querySelectorAll(`${CELL} article`)) {
-      const walker = document.createTreeWalker(article, NodeFilter.SHOW_TEXT);
-      for (let t = walker.nextNode(); t; t = walker.nextNode()) {
-        const text = t.data.trim();
-        if (BOOSTED_LABELS.has(text) && t.parentElement && !t.parentElement.closest(NOT_A_LABEL)) {
-          found.set(article.closest(CELL), `text "${text}"`);
-          break;
-        }
-      }
-    }
-    return found;
-  }
-
-  const debugged = new WeakSet();
-  function debugOnce(el, ...msg) {
-    if (!DEBUG || debugged.has(el)) return;
-    debugged.add(el);
-    console.log(...msg);
-  }
-
-  function updateBoosted() {
-    const boosted = settings.hideBoosted ? findBoostedPosts() : new Map();
-    for (const el of document.querySelectorAll(`.${BOOSTED}`)) {
-      if (!boosted.has(el)) el.classList.remove(BOOSTED);
-    }
-    for (const [post, why] of boosted) {
-      if (post.classList.contains(BOOSTED)) continue;
-      const before = post.offsetHeight;
-      post.classList.add(BOOSTED);
-      if (DEBUG) console.log(`[Black Box] hid boosted post (${why}), ${before}px tall before hiding:`, post);
-    }
-  }
-
   function debugKept(cell, content) {
     if (!DEBUG || reported.has(cell) || cell.offsetHeight < MIN_GAP_PX) return;
     // Only report cells that look suspicious: tall but with no tweet in them.
@@ -180,14 +88,6 @@
   }
 
   function check(cell, now) {
-    if (cell.classList.contains(BOOSTED)) return; // already hidden as a boosted post
-
-    if (!settings.collapseEmpty) {
-      cell.classList.remove(HIDDEN);
-      pending.delete(cell);
-      return;
-    }
-
     const content = findVisibleContent(cell);
 
     if (cell.classList.contains(HIDDEN)) {
@@ -233,22 +133,8 @@
   function scan() {
     timer = null;
     const now = performance.now();
-    updateBoosted();
     document.querySelectorAll(CELL).forEach((cell) => check(cell, now));
   }
-
-  // Load the user's settings, and re-apply them right away when they change.
-  api.storage.sync.get(settings).then((saved) => {
-    Object.assign(settings, saved);
-    scheduleScan(0);
-  });
-  api.storage.onChanged.addListener((changes, area) => {
-    if (area !== 'sync') return;
-    for (const [key, { newValue }] of Object.entries(changes)) {
-      if (key in settings) settings[key] = newValue;
-    }
-    scheduleScan(0);
-  });
 
   new MutationObserver(() => scheduleScan()).observe(document.body, {
     childList: true,

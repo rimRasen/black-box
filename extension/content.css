@@ -1,8 +1,7 @@
 /* Collapse a timeline cell flagged as empty. Height 0 (instead of display:none)
    lets X's virtualized list re-measure the cell and pull later posts up,
    while still letting us detect it if real content shows up later. */
-[data-testid="cellInnerDiv"].bb-empty-cell,
-.bb-boosted.bb-boosted {
+[data-testid="cellInnerDiv"].bb-empty-cell {
   height: 0 !important;
   min-height: 0 !important;
   max-height: 0 !important;
@@ -10,11 +9,4 @@
   margin: 0 !important;
   border: 0 !important;
   overflow: hidden !important;
-}
-
-/* Boosted posts: also hide anything inside that escapes the 0-height box
-   (e.g. absolutely positioned media or overlays). */
-.bb-boosted.bb-boosted {
-  visibility: hidden !important;
-  contain: paint !important;
 }
