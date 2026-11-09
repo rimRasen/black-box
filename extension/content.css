@@ -11,3 +11,10 @@
   border: 0 !important;
   overflow: hidden !important;
 }
+
+/* Boosted posts: also hide anything inside that escapes the 0-height box
+   (e.g. absolutely positioned media or overlays). */
+.bb-boosted.bb-boosted {
+  visibility: hidden !important;
+  contain: paint !important;
+}

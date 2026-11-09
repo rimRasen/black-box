@@ -96,32 +96,45 @@
   const INTERACTIVE = 'button, a, [role="button"], [role="link"], [role="menuitem"], [role="menu"], nav';
   const MIN_POST_PX = 60;
 
-  // Finds the timeline item (one post) that contains `el`. Works on any layout
-  // by climbing until we reach an element that sits in a row of similar,
-  // post-sized siblings, which is what a timeline list looks like.
+  // Finds the timeline item (one post) that contains `el`. Works on any layout:
+  // climbing up from the label, every element that sits among similar,
+  // post-sized siblings is a candidate. The one with the MOST such siblings
+  // wins, because the timeline list has more items than any block inside a
+  // post (text, media...). We never climb past X's main column.
+  const PAGE_LEVEL = 'main, [role="main"], nav, [role="navigation"]';
   function findPostItem(el) {
     const oldCell = el.closest(CELL);
     if (oldCell) return oldCell;
     const sig = (n) => `${n.tagName}|${n.getAttribute('role') || ''}|${n.dataset.testid || ''}`;
+    let best = null;
+    let bestScore = 0;
     for (let node = el; node && node.parentElement && node !== document.body; node = node.parentElement) {
       if (node.classList.contains(BOOSTED)) return node; // already collapsed by us
+      if (node.matches(PAGE_LEVEL) || node.querySelector(PAGE_LEVEL)) break;
       if (node.offsetHeight < MIN_POST_PX) continue;
       let similar = 0;
       for (const sib of node.parentElement.children) {
         if (sib !== node && sig(sib) === sig(node) && sib.offsetHeight >= MIN_POST_PX) similar++;
       }
-      if (similar >= 2) return node;
+      if (similar >= 2 && similar > bestScore) {
+        best = node;
+        bestScore = similar;
+      }
     }
-    return null;
+    return best;
   }
 
   // Returns a Map of post element -> label description, for every boosted post on the page.
   function findBoostedPosts() {
     const found = new Map();
     for (const icon of document.querySelectorAll(ROCKET)) {
-      if (icon.closest(INTERACTIVE)) continue;
+      if (icon.closest(INTERACTIVE)) {
+        debugOnce(icon, '[Black Box] ignored rocket icon inside a button/link/menu:', icon);
+        continue;
+      }
       const post = findPostItem(icon);
       if (post) found.set(post, `rocket icon + "${(icon.parentElement?.parentElement?.innerText || '').trim()}"`);
+      else debugOnce(icon, '[Black Box] found a rocket label but could not work out which post it belongs to:', icon);
     }
     // Old X site: plain text label inside the post.
     for (const article of document.querySelectorAll(`${CELL} article`)) {
@@ -137,6 +150,13 @@
     return found;
   }
 
+  const debugged = new WeakSet();
+  function debugOnce(el, ...msg) {
+    if (!DEBUG || debugged.has(el)) return;
+    debugged.add(el);
+    console.log(...msg);
+  }
+
   function updateBoosted() {
     const boosted = settings.hideBoosted ? findBoostedPosts() : new Map();
     for (const el of document.querySelectorAll(`.${BOOSTED}`)) {
@@ -144,8 +164,9 @@
     }
     for (const [post, why] of boosted) {
       if (post.classList.contains(BOOSTED)) continue;
+      const before = post.offsetHeight;
       post.classList.add(BOOSTED);
-      if (DEBUG) console.log(`[Black Box] hid boosted post (${why}):`, post);
+      if (DEBUG) console.log(`[Black Box] hid boosted post (${why}), ${before}px tall before hiding:`, post);
     }
   }
 
