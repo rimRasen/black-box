@@ -1,0 +1,23 @@
+{
+  "name": "black-box",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Browser extension that collapses empty placeholder boxes in the X timeline.",
+  "license": "MIT",
+  "author": "rimRasen",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rimRasen/black-box.git"
+  },
+  "scripts": {
+    "lint": "web-ext lint --source-dir extension",
+    "build": "web-ext build --source-dir extension --artifacts-dir dist --overwrite-dest",
+    "start:firefox": "web-ext run --source-dir extension --start-url https://x.com/home",
+    "start:android": "web-ext run --source-dir extension --target firefox-android",
+    "sign": "web-ext sign --source-dir extension --artifacts-dir dist --channel unlisted",
+    "icons": "python scripts/make-icons.py"
+  },
+  "devDependencies": {
+    "web-ext": "^8.0.0"
+  }
+}

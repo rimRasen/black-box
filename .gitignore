@@ -1,0 +1,7 @@
+node_modules/
+dist/
+web-ext-artifacts/
+.amo-upload-uuid
+*.log
+.DS_Store
+Thumbs.db
