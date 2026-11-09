@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Black Box - X Empty Space Remover",
   "short_name": "Black Box",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Collapses the empty placeholder boxes (e.g. blocked ads or promoted posts) left behind in the X timeline.",
   "homepage_url": "https://github.com/rimRasen/black-box",
   "icons": {
